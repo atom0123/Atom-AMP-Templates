@@ -1,0 +1,16 @@
+[
+    {
+        "Protocol": "TCP",
+        "Port": 6969,
+        "Name": "SPT HTTP / Backend",
+        "Description": "TCP port used by the SPT launcher and remote clients. Forward TCP when clients connect over the internet.",
+        "Ref": "ServerPort"
+    },
+    {
+        "Protocol": "UDP",
+        "Port": 6970,
+        "Name": "Fika NAT Punch",
+        "Description": "Optional Fika NAT-punch service. Forward UDP only when NAT punching is enabled.",
+        "Ref": "NATPort"
+    }
+]

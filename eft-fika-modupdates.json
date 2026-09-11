@@ -1,0 +1,120 @@
+[
+    {
+        "UpdateStageName": "Create Dotnet Directory",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}dotnet"
+    },
+    {
+        "UpdateStageName": "ASP.NET Core Runtime Download",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"DotnetVersion=\\\"{{DotnetVersion}}\\\"; cd \\\"{{$FullRootDir}}\\\" && if [[ -x dotnet/dotnet ]]; then InstalledVersion=$(dotnet/dotnet --list-runtimes | sed -n \\\"s/^Microsoft\\.AspNetCore\\.App \\([0-9.]*\\) .*/\\1/p\\\" | head -n1); else InstalledVersion=\\\"\\\"; fi; if [[ -z \\\"$DotnetVersion\\\" ]]; then DotnetVersion=$(wget -qO- https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json | jq -r \\\".[\\\\\\\"latest-runtime\\\\\\\"]\\\"); fi; if [[ ! \\\"$DotnetVersion\\\" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then echo \\\"Invalid ASP.NET Core Runtime version format specified\\\" && exit 1; elif [[ \\\"$InstalledVersion\\\" == \\\"$DotnetVersion\\\" ]]; then echo \\\"ASP.NET Core Runtime v$DotnetVersion already installed. Skipping\\\" && exit 0; else [[ -f dotnet.tar.gz ]] && rm -f dotnet.tar.gz >/dev/null 2>&1; wget -qO dotnet.tar.gz https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$DotnetVersion/aspnetcore-runtime-$DotnetVersion-linux-x64.tar.gz || { echo \\\"Download failed from the Microsoft CDN. This is a fault with the CDN, not AMP. Aborting\\\"; exit 1; }; rm -rf dotnet/* >/dev/null 2>&1 && tar -xzf dotnet.tar.gz -C dotnet >/dev/null 2>&1 && rm -f dotnet.tar.gz >/dev/null 2>&1 && echo \\\"ASP.NET Core Runtime v$DotnetVersion downloaded\\\"; fi\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "ASP.NET Core Runtime Download",
+        "UpdateSourcePlatform": "Windows",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "powershell.exe",
+        "UpdateSourceArgs": "-NoProfile -Command \"$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $DotnetVersion='{{DotnetVersion}}'; Set-Location -Path '{{$FullRootDir}}'; if (Test-Path 'dotnet/dotnet.exe') { $InstalledVersion = (& dotnet/dotnet.exe --list-runtimes | Where-Object { $_ -like 'Microsoft.AspNetCore.App*' } | Select-Object -First 1).Split()[1] } else { $InstalledVersion = '' }; if ( [string]::IsNullOrWhiteSpace($DotnetVersion) ) { $DotnetVersion=(Invoke-RestMethod -UseBasicParsing -Uri https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json).\\\"latest-runtime\\\" }; if ($DotnetVersion -notmatch '^\\d+\\.\\d+\\.\\d+$') { Write-Output \\\"Invalid ASP.NET Core Runtime version format specified\\\"; exit 1 } elseif ( $InstalledVersion -eq $DotnetVersion ) { Write-Output \\\"ASP.NET Core Runtime v$DotnetVersion already installed. Skipping\\\"; exit 0 } else { if ( Test-Path dotnet.zip ) { Remove-Item dotnet.zip -Force -ErrorAction SilentlyContinue *> $null }; try { Invoke-WebRequest -UseBasicParsing -Uri https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$DotnetVersion/aspnetcore-runtime-$DotnetVersion-win-x64.zip -OutFile dotnet.zip -ErrorAction Stop } catch { Write-Output \\\"Download failed from the Microsoft CDN. This is a fault with the CDN, not AMP. Aborting\\\"; exit 1; }; Remove-Item -Path 'dotnet/*' -Recurse -Force -ErrorAction SilentlyContinue; Expand-Archive -Path \\\"dotnet.zip\\\" -DestinationPath \\\"dotnet\\\" -Force *> $null; if ( Test-Path dotnet.zip ) { Remove-Item dotnet.zip -Force -ErrorAction SilentlyContinue *> $null }; Write-Output \\\"ASP.NET Core Runtime v$DotnetVersion downloaded\\\" }\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "7-Zip Directory Creation",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}7-Zip",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "7-Zip Installation",
+        "UpdateSourcePlatform": "Windows",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "powershell.exe",
+        "UpdateSourceArgs": "-NoProfile -Command \"$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Set-Location -Path 'tarkov/7-Zip'; $TargetVersion='26.03'; $InstalledVersion=if(Test-Path '.amp-7zip-version'){(Get-Content '.amp-7zip-version' -Raw).Trim()}else{''}; if((Test-Path '7z.exe') -and $InstalledVersion -eq $TargetVersion){Write-Output \\\"7-Zip $TargetVersion already installed. Skipping\\\"; exit 0}; try{Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/ip7z/7zip/releases/download/26.03/7z2603-x64.exe' -OutFile '7z-installer.exe' -ErrorAction Stop; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe' -OutFile '7zr.exe' -ErrorAction Stop}catch{Write-Output \\\"7-Zip download failed: $($_.Exception.Message)\\\"; exit 1}; & ./7zr.exe x -y -aoa 7z-installer.exe *> $null; if($LASTEXITCODE -ne 0 -or -not (Test-Path '7z.exe')){Write-Output '7-Zip extraction failed'; exit 1}; Set-Content -Path '.amp-7zip-version' -Value $TargetVersion -NoNewline; Remove-Item '7z-installer.exe','7zr.exe' -Force -ErrorAction SilentlyContinue; Write-Output \\\"7-Zip $TargetVersion installed\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "7-Zip Installation",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"cd tarkov/7-Zip && TargetVersion=\\\"26.03\\\"; InstalledVersion=\\\"\\\"; [[ -f .amp-7zip-version ]] && InstalledVersion=$(sed -n '1p' .amp-7zip-version); if [[ -x 7zzs && \\\"$InstalledVersion\\\" == \\\"$TargetVersion\\\" ]]; then echo \\\"7-Zip $TargetVersion already installed. Skipping\\\"; exit 0; fi; wget -q --show-progress -O 7z.tar.xz https://github.com/ip7z/7zip/releases/download/26.03/7z2603-linux-x64.tar.xz || { echo \\\"7-Zip download failed\\\"; exit 1; }; tar -xf 7z.tar.xz || { echo \\\"7-Zip extraction failed\\\"; exit 1; }; [[ -x 7zzs ]] || { echo \\\"7zzs was not found after extraction\\\"; exit 1; }; printf '%s' \\\"$TargetVersion\\\" > .amp-7zip-version; rm -f 7z.tar.xz; echo \\\"7-Zip $TargetVersion installed\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Backup Directory Creation",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "CreateDirectory",
+        "UpdateSourceArgs": "{{$FullRootDir}}backups",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "SPT Installation",
+        "UpdateSourcePlatform": "Windows",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "powershell.exe",
+        "UpdateSourceArgs": "-NoProfile -Command \"$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Set-Location -Path 'tarkov/server'; $SPTVersion='{{SPTVersion}}'.Trim(); if([string]::IsNullOrWhiteSpace($SPTVersion)){$SPTVersion='4.1'}; if($SPTVersion -notmatch '^\\d+\\.\\d+(\\.\\d+)?$'){Write-Output \\\"Invalid SPT version '$SPTVersion'. Use 4.1 or an exact version such as 4.1.5\\\"; exit 1}; try{$Releases=Invoke-RestMethod -Uri 'https://api.github.com/repos/sp-tushonka/build/releases?per_page=100' -Headers @{'User-Agent'='AMP-EFT-Fika-Template'} -ErrorAction Stop}catch{Write-Output \\\"Unable to query SPT releases: $($_.Exception.Message)\\\"; exit 1}; $Release=$Releases | Where-Object {$_.tag_name -eq $SPTVersion -or $_.tag_name -like \\\"$SPTVersion.*\\\"} | Select-Object -First 1; if($null -eq $Release){Write-Output \\\"No SPT release found for $SPTVersion\\\"; exit 1}; $ResolvedVersion=$Release.tag_name; $Asset=$Release.assets | Where-Object {$_.name -like '*.7z'} | Select-Object -First 1; if($null -eq $Asset){Write-Output \\\"No .7z asset found for SPT $ResolvedVersion\\\"; exit 1}; $ForceReinstall='{{ForceSPTReinstall}}' -eq 'true'; $Marker='SPT_Runtime/.amp-spt-version'; if(-not $ForceReinstall -and (Test-Path $Marker) -and (Test-Path 'SPT_Runtime/SPT.Server.exe') -and ((Get-Content $Marker -Raw).Trim() -eq $ResolvedVersion)){Write-Output \\\"SPT $ResolvedVersion already installed. Skipping\\\"; exit 0}; $BackupRetentionRaw='{{BackupRetention}}'; $BackupRetention=3; $ParsedRetention=0; if([int]::TryParse($BackupRetentionRaw,[ref]$ParsedRetention) -and $ParsedRetention -ge 1 -and $ParsedRetention -le 10){$BackupRetention=$ParsedRetention}; New-Item -ItemType Directory -Path '../backups' -Force | Out-Null; if(Test-Path 'SPT_Runtime/SPT.Server.exe'){$Timestamp=(Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'); $BackupPath=\\\"../backups/SPT_Runtime-$Timestamp.7z\\\"; Write-Output \\\"Creating $BackupPath\\\"; & ../7-Zip/7z.exe a -t7z -mx=1 $BackupPath SPT_Runtime *> $null; if($LASTEXITCODE -ne 0){Write-Output 'SPT backup failed. Installation aborted'; exit 1}; Get-ChildItem '../backups' -Filter 'SPT_Runtime-*.7z' | Sort-Object LastWriteTime -Descending | Select-Object -Skip $BackupRetention | Remove-Item -Force -ErrorAction SilentlyContinue}; $DownloadURL=$Asset.browser_download_url; Write-Output \\\"Downloading SPT $ResolvedVersion from $DownloadURL\\\"; try{Invoke-WebRequest -UseBasicParsing -Uri $DownloadURL -OutFile 'SPT.7z' -Headers @{'User-Agent'='AMP-EFT-Fika-Template'} -ErrorAction Stop}catch{Write-Output \\\"SPT download failed: $($_.Exception.Message)\\\"; exit 1}; & ../7-Zip/7z.exe t SPT.7z *> $null; if($LASTEXITCODE -ne 0){Write-Output 'SPT archive validation failed'; exit 1}; & ../7-Zip/7z.exe x -y -aoa SPT.7z *> $null; if($LASTEXITCODE -ne 0 -or -not (Test-Path 'SPT_Runtime/SPT.Server.exe')){Write-Output 'SPT extraction failed; backup retained'; exit 1}; Set-Content -Path $Marker -Value $ResolvedVersion -NoNewline; Remove-Item 'SPT.7z' -Force -ErrorAction SilentlyContinue; Write-Output \\\"SPT $ResolvedVersion installed successfully\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "SPT Installation",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"cd tarkov/server && SPTVersion=\\\"{{SPTVersion}}\\\"; [[ -z \\\"$SPTVersion\\\" ]] && SPTVersion=\\\"4.1\\\"; [[ \\\"$SPTVersion\\\" =~ ^[0-9]+\\.[0-9]+(\\.[0-9]+)?$ ]] || { echo \\\"Invalid SPT version '$SPTVersion'. Use 4.1 or an exact version such as 4.1.5\\\"; exit 1; }; ReleaseJSON=$(wget --header='User-Agent: AMP-EFT-Fika-Template' -qO- 'https://api.github.com/repos/sp-tushonka/build/releases?per_page=100') || { echo \\\"Unable to query SPT releases\\\"; exit 1; }; Release=$(printf '%s' \\\"$ReleaseJSON\\\" | jq -c --arg v \\\"$SPTVersion\\\" '[.[] | select(.tag_name == $v or (.tag_name | startswith($v + \\\".\\\")))] | first'); ResolvedVersion=$(printf '%s' \\\"$Release\\\" | jq -r '.tag_name // empty'); DownloadURL=$(printf '%s' \\\"$Release\\\" | jq -r '[.assets[]? | select(.name | endswith(\\\".7z\\\"))][0].browser_download_url // empty'); [[ -n \\\"$ResolvedVersion\\\" ]] || { echo \\\"No SPT release found for $SPTVersion\\\"; exit 1; }; [[ -n \\\"$DownloadURL\\\" ]] || { echo \\\"No .7z asset found for SPT $ResolvedVersion\\\"; exit 1; }; ForceReinstall=\\\"{{ForceSPTReinstall}}\\\"; Marker='SPT_Runtime/.amp-spt-version'; if [[ \\\"$ForceReinstall\\\" != \\\"true\\\" && -x SPT_Runtime/SPT.Server.Linux && -f \\\"$Marker\\\" && $(sed -n '1p' \\\"$Marker\\\") == \\\"$ResolvedVersion\\\" ]]; then echo \\\"SPT $ResolvedVersion already installed. Skipping\\\"; exit 0; fi; BackupRetention=\\\"{{BackupRetention}}\\\"; [[ \\\"$BackupRetention\\\" =~ ^([1-9]|10)$ ]] || BackupRetention=3; mkdir -p ../backups; if [[ -x SPT_Runtime/SPT.Server.Linux ]]; then Timestamp=$(date -u +%Y%m%dT%H%M%SZ); BackupPath=\\\"../backups/SPT_Runtime-$Timestamp.7z\\\"; echo \\\"Creating $BackupPath\\\"; ../7-Zip/7zzs a -t7z -mx=1 \\\"$BackupPath\\\" SPT_Runtime >/dev/null || { echo \\\"SPT backup failed. Installation aborted\\\"; exit 1; }; find ../backups -maxdepth 1 -type f -name 'SPT_Runtime-*.7z' -printf '%T@ %p\\n' | sort -rn | awk -v keep=\\\"$BackupRetention\\\" 'NR>keep {sub(/^[^ ]+ /,\\\"\\\"); print}' | while IFS= read -r OldBackup; do rm -f -- \\\"$OldBackup\\\"; done; fi; echo \\\"Downloading SPT $ResolvedVersion from $DownloadURL\\\"; wget --header='User-Agent: AMP-EFT-Fika-Template' --progress=dot:giga -O SPT.7z \\\"$DownloadURL\\\" || { echo \\\"SPT download failed\\\"; exit 1; }; ../7-Zip/7zzs t SPT.7z >/dev/null 2>&1 || { echo \\\"SPT archive validation failed\\\"; exit 1; }; ../7-Zip/7zzs x -y -aoa SPT.7z >/dev/null || { echo \\\"SPT extraction failed; backup retained\\\"; exit 1; }; [[ -f SPT_Runtime/SPT.Server.Linux ]] || { echo \\\"SPT.Server.Linux was not found after extraction; backup retained\\\"; exit 1; }; chmod +x SPT_Runtime/SPT.Server.Linux; printf '%s' \\\"$ResolvedVersion\\\" > \\\"$Marker\\\"; rm -f SPT.7z; echo \\\"SPT $ResolvedVersion installed successfully\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Fika Server Mod Installation",
+        "UpdateSourcePlatform": "Windows",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "powershell.exe",
+        "UpdateSourceArgs": "-NoProfile -Command \"$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Set-Location -Path 'tarkov/server'; $Requested='{{FikaVersion}}'.Trim(); if([string]::IsNullOrWhiteSpace($Requested) -or $Requested -eq 'latest'){$Endpoint='https://api.github.com/repos/project-fika/Fika-Server-CSharp/releases/latest'}else{$Tag=$Requested -replace '^tags/',''; if($Tag -notmatch '^v'){$Tag=\\\"v$Tag\\\"}; if($Tag -notmatch '^v\\d+\\.\\d+\\.\\d+$'){Write-Output \\\"Invalid Fika version '$Requested'. Use latest, 2.4.0, or v2.4.0\\\"; exit 1}; $Endpoint=\\\"https://api.github.com/repos/project-fika/Fika-Server-CSharp/releases/tags/$Tag\\\"}; try{$Release=Invoke-RestMethod -Uri $Endpoint -Headers @{'User-Agent'='AMP-EFT-Fika-Template'} -ErrorAction Stop}catch{Write-Output \\\"Unable to query Fika releases: $($_.Exception.Message)\\\"; exit 1}; $ResolvedVersion=$Release.tag_name; $Asset=$Release.assets | Where-Object {$_.name -like '*.zip'} | Select-Object -First 1; if($null -eq $Asset){Write-Output \\\"No ZIP asset found for Fika $ResolvedVersion\\\"; exit 1}; $ForceReinstall='{{ForceFikaReinstall}}' -eq 'true'; $ModDir='SPT_Runtime/user/mods/fika-server'; $Marker=\\\"$ModDir/.amp-fika-version\\\"; if(-not $ForceReinstall -and (Test-Path \\\"$ModDir/FikaServer.dll\\\") -and (Test-Path $Marker) -and ((Get-Content $Marker -Raw).Trim() -eq $ResolvedVersion)){Write-Output \\\"Fika $ResolvedVersion already installed. Skipping\\\"; exit 0}; $BackupRetentionRaw='{{BackupRetention}}'; $BackupRetention=3; $ParsedRetention=0; if([int]::TryParse($BackupRetentionRaw,[ref]$ParsedRetention) -and $ParsedRetention -ge 1 -and $ParsedRetention -le 10){$BackupRetention=$ParsedRetention}; $DownloadURL=$Asset.browser_download_url; Write-Output \\\"Downloading Fika $ResolvedVersion from $DownloadURL\\\"; try{Invoke-WebRequest -UseBasicParsing -Uri $DownloadURL -OutFile 'Fika.zip' -Headers @{'User-Agent'='AMP-EFT-Fika-Template'} -ErrorAction Stop}catch{Write-Output \\\"Fika download failed: $($_.Exception.Message)\\\"; exit 1}; & ../7-Zip/7z.exe t Fika.zip *> $null; if($LASTEXITCODE -ne 0){Write-Output 'Fika archive validation failed'; exit 1}; New-Item -ItemType Directory -Path '../backups' -Force | Out-Null; if(Test-Path \\\"$ModDir/FikaServer.dll\\\"){$Timestamp=(Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ'); $BackupPath=\\\"../backups/FikaServer-$Timestamp.7z\\\"; Write-Output \\\"Creating $BackupPath\\\"; & ../7-Zip/7z.exe a -t7z -mx=1 $BackupPath $ModDir *> $null; if($LASTEXITCODE -ne 0){Write-Output 'Fika backup failed. Installation aborted'; exit 1}; Get-ChildItem '../backups' -Filter 'FikaServer-*.7z' | Sort-Object LastWriteTime -Descending | Select-Object -Skip $BackupRetention | Remove-Item -Force -ErrorAction SilentlyContinue}; & ../7-Zip/7z.exe x -y -aoa Fika.zip *> $null; if($LASTEXITCODE -ne 0 -or -not (Test-Path \\\"$ModDir/FikaServer.dll\\\")){Write-Output 'Fika extraction failed; backup retained'; exit 1}; Set-Content -Path $Marker -Value $ResolvedVersion -NoNewline; Remove-Item 'Fika.zip' -Force -ErrorAction SilentlyContinue; Write-Output \\\"Fika $ResolvedVersion installed successfully\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Fika Server Mod Installation",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"cd tarkov/server && Requested=\\\"{{FikaVersion}}\\\"; if [[ -z \\\"$Requested\\\" || \\\"$Requested\\\" == \\\"latest\\\" ]]; then Endpoint='https://api.github.com/repos/project-fika/Fika-Server-CSharp/releases/latest'; else Tag=$(printf '%s' \\\"$Requested\\\" | sed 's#^tags/##'); [[ \\\"$Tag\\\" == v* ]] || Tag=\\\"v$Tag\\\"; [[ \\\"$Tag\\\" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || { echo \\\"Invalid Fika version '$Requested'. Use latest, 2.4.0, or v2.4.0\\\"; exit 1; }; Endpoint=\\\"https://api.github.com/repos/project-fika/Fika-Server-CSharp/releases/tags/$Tag\\\"; fi; Release=$(wget --header='User-Agent: AMP-EFT-Fika-Template' -qO- \\\"$Endpoint\\\") || { echo \\\"Unable to query Fika releases\\\"; exit 1; }; ResolvedVersion=$(printf '%s' \\\"$Release\\\" | jq -r '.tag_name // empty'); DownloadURL=$(printf '%s' \\\"$Release\\\" | jq -r '[.assets[]? | select(.name | endswith(\\\".zip\\\"))][0].browser_download_url // empty'); [[ -n \\\"$ResolvedVersion\\\" ]] || { echo \\\"No Fika release found for $Requested\\\"; exit 1; }; [[ -n \\\"$DownloadURL\\\" ]] || { echo \\\"No ZIP asset found for Fika $ResolvedVersion\\\"; exit 1; }; ForceReinstall=\\\"{{ForceFikaReinstall}}\\\"; ModDir='SPT_Runtime/user/mods/fika-server'; Marker=\\\"$ModDir/.amp-fika-version\\\"; if [[ \\\"$ForceReinstall\\\" != \\\"true\\\" && -f \\\"$ModDir/FikaServer.dll\\\" && -f \\\"$Marker\\\" && $(sed -n '1p' \\\"$Marker\\\") == \\\"$ResolvedVersion\\\" ]]; then echo \\\"Fika $ResolvedVersion already installed. Skipping\\\"; exit 0; fi; BackupRetention=\\\"{{BackupRetention}}\\\"; [[ \\\"$BackupRetention\\\" =~ ^([1-9]|10)$ ]] || BackupRetention=3; echo \\\"Downloading Fika $ResolvedVersion from $DownloadURL\\\"; wget --header='User-Agent: AMP-EFT-Fika-Template' --progress=dot:giga -O Fika.zip \\\"$DownloadURL\\\" || { echo \\\"Fika download failed\\\"; exit 1; }; ../7-Zip/7zzs t Fika.zip >/dev/null 2>&1 || { echo \\\"Fika archive validation failed\\\"; exit 1; }; mkdir -p ../backups; if [[ -f \\\"$ModDir/FikaServer.dll\\\" ]]; then Timestamp=$(date -u +%Y%m%dT%H%M%SZ); BackupPath=\\\"../backups/FikaServer-$Timestamp.7z\\\"; echo \\\"Creating $BackupPath\\\"; ../7-Zip/7zzs a -t7z -mx=1 \\\"$BackupPath\\\" \\\"$ModDir\\\" >/dev/null || { echo \\\"Fika backup failed. Installation aborted\\\"; exit 1; }; find ../backups -maxdepth 1 -type f -name 'FikaServer-*.7z' -printf '%T@ %p\\n' | sort -rn | awk -v keep=\\\"$BackupRetention\\\" 'NR>keep {sub(/^[^ ]+ /,\\\"\\\"); print}' | while IFS= read -r OldBackup; do rm -f -- \\\"$OldBackup\\\"; done; fi; ../7-Zip/7zzs x -y -aoa Fika.zip >/dev/null || { echo \\\"Fika extraction failed; backup retained\\\"; exit 1; }; [[ -f \\\"$ModDir/FikaServer.dll\\\" ]] || { echo \\\"FikaServer.dll was not found after extraction; backup retained\\\"; exit 1; }; printf '%s' \\\"$ResolvedVersion\\\" > \\\"$Marker\\\"; rm -f Fika.zip; echo \\\"Fika $ResolvedVersion installed successfully\\\";\"",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Installation Summary",
+        "UpdateSourcePlatform": "Windows",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "powershell.exe",
+        "UpdateSourceArgs": "-NoProfile -Command \"Set-Location -Path 'tarkov/server'; $SPT=if(Test-Path 'SPT_Runtime/.amp-spt-version'){(Get-Content 'SPT_Runtime/.amp-spt-version' -Raw).Trim()}else{'unknown'}; $Fika=if(Test-Path 'SPT_Runtime/user/mods/fika-server/.amp-fika-version'){(Get-Content 'SPT_Runtime/user/mods/fika-server/.amp-fika-version' -Raw).Trim()}else{'unknown'}; $Dotnet=if(Test-Path '../dotnet/dotnet.exe'){(& ../dotnet/dotnet.exe --list-runtimes | Where-Object {$_ -like 'Microsoft.AspNetCore.App*'} | Select-Object -First 1).Split()[1]}else{'unknown'}; Write-Output \\\"Installed versions: SPT $SPT | Fika $Fika | ASP.NET Core $Dotnet\\\";\"",
+        "SkipOnFailure": true
+    },
+    {
+        "UpdateStageName": "Installation Summary",
+        "UpdateSourcePlatform": "Linux",
+        "UpdateSource": "Executable",
+        "UpdateSourceData": "/bin/bash",
+        "UpdateSourceArgs": "-c \"cd tarkov/server && SPT=unknown; Fika=unknown; Dotnet=unknown; [[ -f SPT_Runtime/.amp-spt-version ]] && SPT=$(sed -n '1p' SPT_Runtime/.amp-spt-version); [[ -f SPT_Runtime/user/mods/fika-server/.amp-fika-version ]] && Fika=$(sed -n '1p' SPT_Runtime/user/mods/fika-server/.amp-fika-version); [[ -x ../dotnet/dotnet ]] && Dotnet=$(../dotnet/dotnet --list-runtimes | sed -n 's/^Microsoft\\.AspNetCore\\.App \\([0-9.]*\\) .*/\\1/p' | head -n1); echo \\\"Installed versions: SPT $SPT | Fika $Fika | ASP.NET Core $Dotnet\\\";\"",
+        "SkipOnFailure": true
+    },
+    {
+        "UpdateStageName": "Server Startup",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "StartApplication",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Wait For Server Startup",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "WaitForStartupComplete",
+        "SkipOnFailure": false
+    },
+    {
+        "UpdateStageName": "Server Shutdown",
+        "UpdateSourcePlatform": "All",
+        "UpdateSource": "ShutdownApplication",
+        "SkipOnFailure": false
+    }
+]
